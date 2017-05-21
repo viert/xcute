@@ -1,0 +1,4 @@
+readline
+requests
+termcolor
+gevent
