@@ -64,8 +64,11 @@ class Api(object):
         self.__c = conductor
 
     def get(self, key, value):
-        return self.__c.cache[self.CLASS_KEY][key].get(value)
-
+        cache = self.__c.cache[self.CLASS_KEY][key]
+        if type(cache) == defaultdict:
+            return cache[value]
+        else:
+            return cache.get(value)
 
 class ProjectApi(Api):
     CLASS_KEY = Project
@@ -223,16 +226,16 @@ class Conductor(object):
                 token = token[1:]
 
             if token.startswith("%"):
-                group = self.groups.get(token[1:], True)
+                group = self.groups.get(Group.KEY, token[1:])
                 if group is not None:
                     hosts = set(group.all_hosts)
             elif token.startswith("*"):
-                project = self.projects.get(token[1:], True)
+                project = self.projects.get(Project.KEY, token[1:])
                 if project:
                     for group in project.groups:
                         hosts = hosts.union(group.all_hosts)
             else:
-                host = self.hosts.get(token)
+                host = self.hosts.get(Host.KEY, token)
                 if host:
                     hosts.add(host)
                 else:

@@ -2,6 +2,12 @@ import fcntl, termios, struct, os, readline
 from cmd import Cmd
 from termcolor import cprint, colored
 from xclib.conductor import Conductor
+from xclib.conductor.models import Datacenter, Project, Host, Group
+
+if 'libedit' in readline.__doc__:
+    readline.parse_and_bind("bind ^I rl_complete")
+else:
+    readline.parse_and_bind("tab: complete")
 
 
 def terminal_size():
@@ -15,7 +21,7 @@ def error(msg):
     return cprint("ERROR: %s" % msg, "red")
 
 def warn(msg):
-    return cprint("WARNING: %s" % msg, "yellow")
+    return cprint("WARNING: %s" % msg, "grey")
 
 class Cli(Cmd):
 
@@ -63,6 +69,20 @@ class Cli(Cmd):
         except KeyboardInterrupt:
             print
             self.cmdloop()
+
+    def preloop(self):
+        delims = set(readline.get_completer_delims())
+        delims.remove('%')
+        delims.remove('*')
+        delims.remove('@')
+        delims.remove('-')
+        delims.remove('/')
+        delims.remove(',')
+        readline.set_completer_delims(''.join(delims))
+        try:
+          readline.read_history_file(self.HISTORY_FILE)
+        except (OSError, IOError), e:
+          warn("Can't read history file: %s" % e.message)
 
     def postloop(self):
         try:
@@ -119,3 +139,64 @@ class Cli(Cmd):
     def complete_mode(self, text, line, begidx, endidx):
         return [x for x in self.MODES if x.startswith(text)]
 
+    def do_hostlist(self, args):
+        """hostlist:\n  resolve conductor expression to host list"""
+        args = args.split()
+        if len(args) != 1:
+            cprint("Usage: hostlist <conductor expression>", "red")
+            return
+
+        expr = args[0]
+        hosts = list(self.conductor.resolve(expr))
+        if len(hosts) == 0:
+            cprint("Empty list", "red")
+            return
+
+        hosts.sort()
+        hrlen = max([len(x) for x in hosts])
+        if hrlen < 10 + len(expr): hrlen = 10 + len(expr)
+        hr = colored("=" * hrlen, "green")
+
+        print hr
+        print "Hostlist: " + expr
+        print hr
+        for host in hosts:
+            print host
+
+    def __completion_argnum(self, line, endidx):
+        return len(line[:endidx].split()) - 2
+
+    def complete_hostlist(self, text, line, begidx, endidx):
+        return self.complete_exec(text, line, begidx, endidx)
+
+    def complete_exec(self, text, line, begidx, endidx):
+        if self.__completion_argnum(line, endidx) != 0:
+            return []
+
+        if line[begidx-1] == "@":
+            dcpref = text
+            datacenters = self.conductor.autocompleters[Datacenter].complete(dcpref)
+            return list(datacenters)
+
+        prefix = ''
+        while True:
+            try:
+                cmindex = text.index(',')
+            except ValueError:
+                break
+            prefix += text[:cmindex+1]
+            text = text[cmindex+1:]
+
+        if text.startswith('-'):
+            prefix += '-'
+            text = text[1:]
+
+        if text.startswith('%'):
+            groups = self.conductor.autocompleters[Group].complete(text[1:])
+            return [prefix + "%" + g for g in groups]
+        elif text.startswith('*'):
+            projects = self.conductor.autocompleters[Project].complete(text[1:])
+            return [prefix + "*" + p for p in projects]
+        else:
+            hosts = self.conductor.autocompleters[Host].complete(text)
+            return [prefix + h for h in hosts]

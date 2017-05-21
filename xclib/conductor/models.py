@@ -87,7 +87,7 @@ class Group(ConductorObject):
     @property
     def project(self):
         return self.__c.projects.get("_id", self.project_id)
-    
+
     @property
     def all_children(self):
         children = set(self.children)
