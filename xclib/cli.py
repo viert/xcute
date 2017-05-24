@@ -1,12 +1,18 @@
-import fcntl, termios, struct, os, readline
-from cmd import Cmd
+import gnureadline as readline
+import sys
+sys.modules["readline"] = readline
+
+import cmd
+import fcntl, termios, struct, os
 from termcolor import cprint, colored
 from xclib.conductor import Conductor
 from xclib.conductor.models import Datacenter, Project, Host, Group
 
 if 'libedit' in readline.__doc__:
+    print "using libedit"
     readline.parse_and_bind("bind ^I rl_complete")
 else:
+    print "using gnu readline"
     readline.parse_and_bind("tab: complete")
 
 
@@ -23,7 +29,7 @@ def error(msg):
 def warn(msg):
     return cprint("WARNING: %s" % msg, "grey")
 
-class Cli(Cmd):
+class Cli(cmd.Cmd):
 
     MODES = ("collapse", "stream")
     DEFAULT_MODE = "collapse"
@@ -33,8 +39,7 @@ class Cli(Cmd):
     HISTORY_FILE = os.path.join(os.getenv("HOME"), ".xcute_history")
 
     def __init__(self, options={}):
-        Cmd.__init__(self)
-
+        cmd.Cmd.__init__(self)
         self.conductor = Conductor(options["projects"],
                                    host=options["conductor_host"],
                                    port=options["conductor_port"],
@@ -65,20 +70,22 @@ class Cli(Cmd):
 
     def cmdloop(self, intro=None):
         try:
-            Cmd.cmdloop(self)
+            cmd.Cmd.cmdloop(self)
         except KeyboardInterrupt:
             print
             self.cmdloop()
 
     def preloop(self):
         delims = set(readline.get_completer_delims())
+        print ''.join(delims)
         delims.remove('%')
         delims.remove('*')
-        delims.remove('@')
+        # delims.remove('@')
         delims.remove('-')
         delims.remove('/')
-        delims.remove(',')
+        # delims.remove(',')
         readline.set_completer_delims(''.join(delims))
+
         try:
           readline.read_history_file(self.HISTORY_FILE)
         except (OSError, IOError), e:
@@ -179,13 +186,6 @@ class Cli(Cmd):
             return list(datacenters)
 
         prefix = ''
-        while True:
-            try:
-                cmindex = text.index(',')
-            except ValueError:
-                break
-            prefix += text[:cmindex+1]
-            text = text[cmindex+1:]
 
         if text.startswith('-'):
             prefix += '-'
