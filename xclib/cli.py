@@ -10,7 +10,6 @@ from xclib.conductor import Conductor
 from xclib.conductor.models import Datacenter, Project, Host, Group
 
 
-
 def terminal_size():
     h, w, hp, wp = struct.unpack('HHHH',
         fcntl.ioctl(0, termios.TIOCGWINSZ,
@@ -74,10 +73,11 @@ class Cli(cmd.Cmd):
 
     def preloop(self):
         delims = set(readline.get_completer_delims())
-        delims.remove('%')
-        delims.remove('*')
-        delims.remove('-')
-        delims.remove('/')
+        for d in "%*-/":
+            try:
+                delims.remove(d)
+            except KeyError:
+                pass
         readline.set_completer_delims(''.join(delims))
 
         try:
@@ -165,7 +165,8 @@ class Cli(cmd.Cmd):
             print host
 
     def __completion_argnum(self, line, endidx):
-        return len(line[:endidx].split()) - 2
+        argnum = len(line.split(" ")) - 2
+        return argnum
 
     def complete_hostlist(self, text, line, begidx, endidx):
         return self.complete_exec(text, line, begidx, endidx)
@@ -194,3 +195,13 @@ class Cli(cmd.Cmd):
         else:
             hosts = self.conductor.autocompleters[Host].complete(text)
             return [prefix + h for h in hosts]
+
+    def complete_ssh(self, text, line, begidx, endidx):
+        return self.complete_exec(text, line, begidx, endidx)
+
+    def do_ssh(self, args):
+        hosts = self.conductor.resolve(args.split()[0])
+        for host in hosts:
+            cprint("=== ssh %s@%s ===" % (self.user, host), "green")
+            command = "ssh -l %s %s" % (self.user, host)
+            os.system(command)
