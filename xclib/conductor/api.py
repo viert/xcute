@@ -1,9 +1,14 @@
 import json
 import os
+import time
 import requests
 import cPickle as pickle
 from collections import defaultdict
 from xclib.conductor.models import Datacenter, Project, Group, Host
+
+
+class CacheExpired(Exception):
+    pass
 
 
 class Autocompleter(object):
@@ -90,8 +95,17 @@ class Conductor(object):
     DEFAULT_HOST = "localhost"
     DEFAULT_PORT = 5000
     DEFAULT_CACHE_DIR = os.path.join(os.getenv("HOME"), ".xcute_cache")
+    DEFAULT_CACHE_TTL = 3600
 
-    def __init__(self, projects, host=DEFAULT_HOST, port=DEFAULT_PORT, cache_dir=DEFAULT_CACHE_DIR, drop_cache=True):
+    def __init__(self, projects,
+                 cache_ttl=DEFAULT_CACHE_TTL,
+                 host=DEFAULT_HOST,
+                 port=DEFAULT_PORT,
+                 cache_dir=DEFAULT_CACHE_DIR,
+                 drop_cache=False,
+                 print_func=None):
+        self.print_func = print_func
+        self.cache_ttl=cache_ttl
         self.project_list = projects
         self.cache_dir = cache_dir
         self.datacenters = DatacenterApi(self)
@@ -110,6 +124,8 @@ class Conductor(object):
             try:
                 self.load()
             except:
+                if self.print_func:
+                    self.print_func("Reloading data from conductor...")
                 self.fetch()
 
     def reset_cache(self):
@@ -152,17 +168,27 @@ class Conductor(object):
 
     def load(self):
         with open(self.cache_filename) as cf:
-            self.cache = pickle.load(cf)
+            data = pickle.load(cf)
+            if time.time() - data["ts"] > self.cache_ttl:
+                raise CacheExpired()
+            else:
+                self.cache = data["data"]
         with open(self.autocompleters_filename) as cf:
-            self.autocompleters = pickle.load(cf)
+            data = pickle.load(cf)
+            if time.time() - data["ts"] > self.cache_ttl:
+                raise CacheExpired()
+            else:
+                self.autocompleters = data["data"]
 
     def save(self):
+        if self.print_func:
+            self.print_func("Saving cache...")
         if not os.path.isdir(self.cache_dir):
             os.makedirs(self.cache_dir)
         with open(self.cache_filename, "w") as cf:
-            pickle.dump(self.cache, cf)
+            pickle.dump({ "ts": time.time(), "data": self.cache }, cf)
         with open(self.autocompleters_filename, "w") as cf:
-            pickle.dump(self.autocompleters, cf)
+            pickle.dump({ "ts": time.time(), "data": self.autocompleters }, cf)
 
     def fetch(self):
         self.reset_cache()

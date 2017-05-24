@@ -18,11 +18,15 @@ def terminal_size():
 
 
 def error(msg):
-    return cprint("ERROR: %s" % msg, "red")
+    cprint("ERROR: %s" % msg, "red")
 
 
 def warn(msg):
-    return cprint("WARNING: %s" % msg, "grey")
+    cprint("WARNING: %s" % msg, "yellow")
+
+
+def export_print(msg):
+    cprint(msg, "yellow")
 
 
 class Cli(cmd.Cmd):
@@ -39,7 +43,8 @@ class Cli(cmd.Cmd):
         self.conductor = Conductor(options["projects"],
                                    host=options["conductor_host"],
                                    port=options["conductor_port"],
-                                   cache_dir=options["cache_dir"])
+                                   cache_dir=options["cache_dir"],
+                                   print_func=export_print)
 
         self.user = options.get("user") or os.getlogin()
         self.progressbar = options.get("progressbar") or self.DEFAULT_OPTIONS["progressgbar"]
@@ -200,8 +205,17 @@ class Cli(cmd.Cmd):
         return self.complete_exec(text, line, begidx, endidx)
 
     def do_ssh(self, args):
+        """ssh:\n connect to host(s) via ssh"""
         hosts = self.conductor.resolve(args.split()[0])
         for host in hosts:
             cprint("=== ssh %s@%s ===" % (self.user, host), "green")
             command = "ssh -l %s %s" % (self.user, host)
             os.system(command)
+
+    def do_stream(self, args):
+        """stream:\n  shortcut to 'mode stream'"""
+        return self.do_mode("stream")
+
+    def do_collapse(self, args):
+        """collapse:\n  shortcut to 'mode collapse'"""
+        return self.do_mode("collapse")
