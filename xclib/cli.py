@@ -1,6 +1,7 @@
-import gnureadline as readline
 import sys
+import gnureadline as readline
 sys.modules["readline"] = readline
+readline.parse_and_bind("tab: complete")
 
 import cmd
 import fcntl, termios, struct, os
@@ -8,12 +9,6 @@ from termcolor import cprint, colored
 from xclib.conductor import Conductor
 from xclib.conductor.models import Datacenter, Project, Host, Group
 
-if 'libedit' in readline.__doc__:
-    print "using libedit"
-    readline.parse_and_bind("bind ^I rl_complete")
-else:
-    print "using gnu readline"
-    readline.parse_and_bind("tab: complete")
 
 
 def terminal_size():
@@ -26,8 +21,10 @@ def terminal_size():
 def error(msg):
     return cprint("ERROR: %s" % msg, "red")
 
+
 def warn(msg):
     return cprint("WARNING: %s" % msg, "grey")
+
 
 class Cli(cmd.Cmd):
 
@@ -77,13 +74,10 @@ class Cli(cmd.Cmd):
 
     def preloop(self):
         delims = set(readline.get_completer_delims())
-        print ''.join(delims)
         delims.remove('%')
         delims.remove('*')
-        # delims.remove('@')
         delims.remove('-')
         delims.remove('/')
-        # delims.remove(',')
         readline.set_completer_delims(''.join(delims))
 
         try:
