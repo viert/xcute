@@ -3,16 +3,13 @@ from gevent.select import select
 from gevent.pool import Pool
 from gevent.subprocess import Popen, PIPE
 from collections import defaultdict
-import sys
-import gnureadline as readline
-sys.modules["readline"] = readline
-readline.parse_and_bind("tab: complete")
-
-import cmd
-import fcntl, termios, struct, os
 from termcolor import cprint, colored
 from xclib.conductor import Conductor
 from xclib.conductor.models import Datacenter, Project, Host, Group
+import sys, fcntl, termios, struct, os, cmd
+import gnureadline as readline
+sys.modules["readline"] = readline
+readline.parse_and_bind("tab: complete")
 
 
 def terminal_size():
@@ -61,7 +58,7 @@ class Cli(cmd.Cmd):
         self.finished = False
         if "mode" in options:
             if not options["mode"] in self.MODES:
-                error("invalid mode '%s'. use 'stream' or 'collapse'" % options["mode"])
+                error("invalid mode '%s'. use 'stream', 'collapse' or 'serial" % options["mode"])
                 self.mode = self.DEFAULT_MODE
             else:
                 self.mode = options["mode"]
@@ -353,3 +350,57 @@ class Cli(cmd.Cmd):
         """user:\n  set user"""
         username = args.split()[0]
         self.user = username
+
+    def do_ls(self, args):
+        """ls:\n  list directory (using shell cmd)"""
+        return self.__os_cmd("ls", args)
+
+    def do_cd(self, args):
+        """cd:\n  change working directory"""
+        if not args:
+            newdir = os.getenv('HOME')
+        else:
+            newdir = args.split()[0]
+
+        try:
+            os.chdir(newdir)
+        except OSError as e:
+            error("Can't change dir to %s: %s" % (newdir, e.message))
+
+    def complete_cd(self, text, line, begidx, endidx):
+        return self.__file_completion(text)
+
+    def do_pwd(self, args):
+        """pwd:\n  print current working directory"""
+        print os.getcwd()
+
+    def __os_cmd(self, cmd, args):
+        args = [cmd] + args.split()
+        p = Popen(args, stdin=PIPE, stdout=PIPE, stderr=PIPE, close_fds=True)
+        p.wait()
+        for line in p.stderr:
+            sys.stderr.write(colored(line, 'red'))
+        for line in p.stdout:
+            sys.stdout.write(line)
+
+    def __file_completion(self, text):
+        srcdir = os.path.dirname(text)
+        ftext = os.path.basename(text)
+
+        listing = os.listdir(srcdir) if srcdir else os.listdir('.')
+
+        if srcdir and not srcdir.endswith('/'):
+            srcdir = srcdir + '/'
+
+        listing = [srcdir + x for x in listing if x.startswith(ftext)]
+        full = []
+
+        for item in listing:
+            if os.path.isdir(item):
+                full += [item + '/' + x for x in os.listdir(item)]
+            else:
+                full.append(item)
+
+        full.sort()
+        return full
+
