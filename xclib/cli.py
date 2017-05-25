@@ -2,6 +2,7 @@ from gevent import Greenlet
 from gevent.select import select
 from gevent.pool import Pool
 from gevent.subprocess import Popen, PIPE
+from collections import defaultdict
 import sys
 import gnureadline as readline
 sys.modules["readline"] = readline
@@ -308,7 +309,45 @@ class Cli(cmd.Cmd):
         self.print_exec_results(codes)
 
     def run_collapse(self, hosts, cmd):
-        error("Collapse mode has not been implemented yet")
+        progress = None
+        if self.progressbar:
+            from progressbar import ProgressBar, Percentage, Bar, ETA, FileTransferSpeed
+            progress = ProgressBar(
+                widgets=["Running: ", Percentage(), ' ', Bar(marker='.'), ' ', ETA(), ' ', FileTransferSpeed()],
+                maxval=len(hosts))
+
+        codes = {"total": 0, "error": 0, "success": 0}
+        outputs = defaultdict(list)
+        def worker(host, cmd):
+            p = Popen(["ssh", "-l", self.user, host, cmd], stdout=PIPE, stderr=PIPE)
+            o, e = p.communicate()
+            outputs[o].append(host)
+            if p.poll() == 0:
+                codes["success"] += 1
+            else:
+                codes["error"] += 1
+            codes["total"] += 1
+            if self.progressbar:
+                progress.update(codes["total"])
+
+        pool = Pool(self.ssh_threads)
+        if self.progressbar:
+            progress.start()
+        for host in hosts:
+            pool.start(Greenlet(worker, host, cmd))
+        pool.join()
+        if self.progressbar:
+            progress.finish()
+        self.print_exec_results(codes)
+        print
+        for output, hosts in outputs.items():
+            msg = " %s    " % ', '.join(hosts)
+            table_width = min([len(msg) + 2, terminal_size()[0]])
+            cprint("=" * table_width, "blue", attrs=["bold"])
+            cprint(msg, "blue", attrs=["bold"])
+            cprint("=" * table_width, "blue", attrs=["bold"])
+            print
+            print output
 
     def do_user(self, args):
         """user:\n  set user"""
