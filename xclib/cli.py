@@ -33,9 +33,14 @@ def export_print(msg):
     cprint(msg, "yellow")
 
 
+def aligned(message, align_len):
+    message = "=" * 6 + " " + message + " "
+    return message + "=" * (align_len - len(message))
+
+
 class Cli(cmd.Cmd):
 
-    MODES = ("collapse", "stream")
+    MODES = ("collapse", "stream", "serial")
     DEFAULT_MODE = "collapse"
     DEFAULT_OPTIONS = {
         "progressgbar": True
@@ -66,8 +71,11 @@ class Cli(cmd.Cmd):
     def prompt(self):
         if self.mode == "collapse":
             mode = colored("[Collapse]", "green")
-        else:
+        elif self.mode == "stream":
             mode = colored("[Stream]", "yellow")
+        elif self.mode == "serial":
+            mode = colored("[Serial]", "cyan")
+
         return "%s %s> " % (mode, colored(self.user, "blue", attrs=["bold"]))
 
     def postcmd(self, stop, line):
@@ -174,7 +182,7 @@ class Cli(cmd.Cmd):
             print host
 
     def __completion_argnum(self, line, endidx):
-        argnum = len(line.split(" ")) - 2
+        argnum = len(line[:endidx].split(" ")) - 2
         return argnum
 
     def complete_hostlist(self, text, line, begidx, endidx):
@@ -224,6 +232,10 @@ class Cli(cmd.Cmd):
         """collapse:\n  shortcut to 'mode collapse'"""
         return self.do_mode("collapse")
 
+    def do_serial(self, args):
+        """serial:\n  shortcut to 'mode serial'"""
+        return self.do_mode("serial")
+
     def do_exec(self, args):
         expr, cmd = args.split(None, 1)
         hosts = self.conductor.resolve(expr)
@@ -233,11 +245,36 @@ class Cli(cmd.Cmd):
 
         if self.mode == "stream":
             self.run_stream(hosts, cmd)
-        else:
+        elif self.mode == "collapse":
             self.run_collapse(hosts, cmd)
+        elif self.mode == "serial":
+            self.run_serial(hosts, cmd)
+
+    def run_serial(self, hosts, cmd):
+        codes = {"total": 0, "error": 0, "success": 0}
+        align_len = len(max(hosts, key=len)) + len(self.user) + len(cmd) + 24
+
+        for host in hosts:
+            msg = "ssh %s@%s \"%s\"" % (self.user, host, cmd)
+            cprint(aligned(msg, align_len), "blue", attrs=["bold"])
+            code = os.system("ssh -l %s %s \"%s\"" % (self.user, host, cmd))
+            if code == 0:
+                codes["success"] += 1
+            else:
+                codes["error"] += 1
+            codes["total"] += 1
+
+        self.print_exec_results(codes)
+
+    def print_exec_results(self, codes):
+        msg = " Hosts processed: %d, success: %d, error: %d    " % (codes["total"], codes["success"], codes["error"])
+        hr = "=" * len(msg)
+        cprint(hr, "green")
+        cprint(msg, "green")
+        cprint(hr, "green")
 
     def run_stream(self, hosts, cmd):
-
+        codes = {"total": 0, "error": 0, "success": 0}
         def worker(host, cmd):
             p = Popen(["ssh", "-l", self.user, host, cmd], stdout=PIPE, stderr=PIPE)
             while True:
@@ -258,11 +295,22 @@ class Cli(cmd.Cmd):
                     print "%s: %s" % (colored(host, "blue", attrs=["bold"]), outline.strip())
                 if errline != "":
                     print "%s: %s" % (colored(host, "blue", attrs=["bold"]), colored(errline.strip(), "red"))
+            if p.poll() == 0:
+                codes["success"] += 1
+            else:
+                codes["error"] += 1
+            codes["total"] += 1
 
         pool = Pool(self.ssh_threads)
         for host in hosts:
             pool.start(Greenlet(worker, host, cmd))
         pool.join()
+        self.print_exec_results(codes)
 
     def run_collapse(self, hosts, cmd):
         error("Collapse mode has not been implemented yet")
+
+    def do_user(self, args):
+        """user:\n  set user"""
+        username = args.split()[0]
+        self.user = username

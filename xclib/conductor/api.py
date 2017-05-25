@@ -192,9 +192,16 @@ class Conductor(object):
 
     def fetch(self):
         self.reset_cache()
-        response = requests.get(self.ex_url)
-        if response.status_code != 200:
-            raise ConductorError(response.status_code, response.content)
+        try:
+            response = requests.get(self.ex_url)
+            if response.status_code != 200:
+                raise ConductorError(response.status_code, response.content)
+        except Exception as e:
+            if self.print_func:
+                self.print_func(e)
+                self.print_func("Error getting data from conductor, falling back to cache")
+            self.load()
+            return
         data = json.loads(response.content)["data"]
 
         for dc_params in data["datacenters"]:
