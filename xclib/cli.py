@@ -1,3 +1,7 @@
+from gevent import Greenlet
+from gevent.select import select
+from gevent.pool import Pool
+from gevent.subprocess import Popen, PIPE
 import sys
 import gnureadline as readline
 sys.modules["readline"] = readline
@@ -45,7 +49,7 @@ class Cli(cmd.Cmd):
                                    port=options["conductor_port"],
                                    cache_dir=options["cache_dir"],
                                    print_func=export_print)
-
+        self.ssh_threads = options["ssh_threads"]
         self.user = options.get("user") or os.getlogin()
         self.progressbar = options.get("progressbar") or self.DEFAULT_OPTIONS["progressgbar"]
         self.finished = False
@@ -219,3 +223,46 @@ class Cli(cmd.Cmd):
     def do_collapse(self, args):
         """collapse:\n  shortcut to 'mode collapse'"""
         return self.do_mode("collapse")
+
+    def do_exec(self, args):
+        expr, cmd = args.split(None, 1)
+        hosts = self.conductor.resolve(expr)
+        if len(hosts) == 0:
+            error("Empty hostlist")
+            return
+
+        if self.mode == "stream":
+            self.run_stream(hosts, cmd)
+        else:
+            self.run_collapse(hosts, cmd)
+
+    def run_stream(self, hosts, cmd):
+
+        def worker(host, cmd):
+            p = Popen(["ssh", "-l", self.user, host, cmd], stdout=PIPE, stderr=PIPE)
+            while True:
+                outs, _, _ = select([p.stdout, p.stderr], [], [])
+                if p.stdout in outs:
+                    outline = p.stdout.readline()
+                else:
+                    outline = ""
+                if p.stderr in outs:
+                    errline = p.stderr.readline()
+                else:
+                    errline = ""
+
+                if outline == "" and errline == "" and p.poll() is not None:
+                    break
+
+                if outline != "":
+                    print "%s: %s" % (colored(host, "blue", attrs=["bold"]), outline.strip())
+                if errline != "":
+                    print "%s: %s" % (colored(host, "blue", attrs=["bold"]), colored(errline.strip(), "red"))
+
+        pool = Pool(self.ssh_threads)
+        for host in hosts:
+            pool.start(Greenlet(worker, host, cmd))
+        pool.join()
+
+    def run_collapse(self, hosts, cmd):
+        error("Collapse mode has not been implemented yet")

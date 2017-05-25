@@ -14,7 +14,8 @@ if __name__ == '__main__':
         "user": os.getlogin(),
         "cache_dir": os.path.join(os.getenv("HOME"), ".xcute_cache"),
         "conductor_host": "localhost",
-        "conductor_port": "5000"
+        "conductor_port": "5000",
+        "ssh_threads": "10"
     }
     cp = ConfigParser(defaults=DEFAULT_OPTIONS)
 
@@ -32,6 +33,7 @@ if __name__ == '__main__':
                 options["cache_dir"] = cp.get("main", "cache_dir")
                 options["conductor_host"] = cp.get("main", "conductor_host")
                 options["conductor_port"] = cp.getint("main", "conductor_port")
+                options["ssh_threads"] = cp.getint("main", "ssh_threads")
                 p_names = cp.get("main", "projects")
                 if p_names == "":
                     error("you should include at least one project into 'projects' variable in config")
