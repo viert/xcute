@@ -346,7 +346,6 @@ class Cli(cmd.Cmd):
             cprint("=" * table_width, "blue", attrs=["bold"])
             cprint(msg, "blue", attrs=["bold"])
             cprint("=" * table_width, "blue", attrs=["bold"])
-            print
             print output
 
     def do_user(self, args):
@@ -407,3 +406,6 @@ class Cli(cmd.Cmd):
         full.sort()
         return full
 
+    def do_reload(self, args):
+        export_print("Reloading data from conductor...")
+        self.conductor.fetch()
