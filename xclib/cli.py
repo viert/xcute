@@ -76,6 +76,9 @@ class Cli(cmd.Cmd):
 
         return "%s %s> " % (mode, colored(self.user, "blue", attrs=["bold"]))
 
+    def emptyline(self):
+        pass
+
     def postcmd(self, stop, line):
         return self.finished
 
