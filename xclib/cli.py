@@ -77,6 +77,9 @@ class Cli(cmd.Cmd):
 
         return "%s %s> " % (mode, colored(self.user, "blue", attrs=["bold"]))
 
+    def emptyline(self):
+        pass
+
     def postcmd(self, stop, line):
         return self.finished
 
@@ -384,7 +387,6 @@ class Cli(cmd.Cmd):
             cprint("=" * table_width, "blue", attrs=["bold"])
             cprint(msg, "blue", attrs=["bold"])
             cprint("=" * table_width, "blue", attrs=["bold"])
-            print
             print output
 
     def do_user(self, args):
@@ -445,17 +447,6 @@ class Cli(cmd.Cmd):
         full.sort()
         return full
 
-    def run_alias(self, args):
-        import functools
-
-
-    def do_alias(self, args):
-        alias_name, script = args.split(None, 1)
-        func_name = "do_" + alias_name
-        if hasattr(self, func_name):
-            if getattr(self, func_name) != self.run_alias:
-                error("Can't overwrite built-in command")
-                return
-        setattr(self, func_name, self.run_alias)
-        self.alias_scripts[alias_name] = script
-        export_print("Alias %s has been created" % alias_name)
+    def do_reload(self, args):
+        export_print("Reloading data from conductor...")
+        self.conductor.fetch()
