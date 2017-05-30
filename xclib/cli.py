@@ -38,7 +38,7 @@ def aligned(message, align_len):
 
 class Cli(cmd.Cmd):
 
-    MODES = ("collapse", "stream", "serial")
+    MODES = ("collapse", "parallel", "serial")
     DEFAULT_MODE = "collapse"
     DEFAULT_OPTIONS = {
         "progressgbar": True
@@ -56,9 +56,10 @@ class Cli(cmd.Cmd):
         self.user = options.get("user") or os.getlogin()
         self.progressbar = options.get("progressbar") or self.DEFAULT_OPTIONS["progressgbar"]
         self.finished = False
+        self.alias_scripts = {}
         if "mode" in options:
             if not options["mode"] in self.MODES:
-                error("invalid mode '%s'. use 'stream', 'collapse' or 'serial" % options["mode"])
+                error("invalid mode '%s'. use 'parallel', 'collapse' or 'serial" % options["mode"])
                 self.mode = self.DEFAULT_MODE
             else:
                 self.mode = options["mode"]
@@ -69,8 +70,8 @@ class Cli(cmd.Cmd):
     def prompt(self):
         if self.mode == "collapse":
             mode = colored("[Collapse]", "green")
-        elif self.mode == "stream":
-            mode = colored("[Stream]", "yellow")
+        elif self.mode == "parallel":
+            mode = colored("[Parallel]", "yellow")
         elif self.mode == "serial":
             mode = colored("[Serial]", "cyan")
 
@@ -142,13 +143,13 @@ class Cli(cmd.Cmd):
         self.finished = True
 
     def do_mode(self, args):
-        """mode:\n  set exec output mode to collapse/stream"""
+        """mode:\n  set exec output mode to collapse/serial/parallel"""
         if args:
             mode = args.split()[0]
         else:
             mode = Cli.DEFAULT_MODE
         if not mode in Cli.MODES:
-            error("Invalid mode: %s, use 'collapse' or 'stream'" % mode)
+            error("Invalid mode: %s, use 'collapse', 'serial' or 'parallel'" % mode)
             return
         self.mode = mode
 
@@ -184,6 +185,15 @@ class Cli(cmd.Cmd):
         return argnum
 
     def complete_hostlist(self, text, line, begidx, endidx):
+        return self.complete_exec(text, line, begidx, endidx)
+
+    def complete_p_exec(self, text, line, begidx, endidx):
+        return self.complete_exec(text, line, begidx, endidx)
+
+    def complete_c_exec(self, text, line, begidx, endidx):
+        return self.complete_exec(text, line, begidx, endidx)
+
+    def complete_s_exec(self, text, line, begidx, endidx):
         return self.complete_exec(text, line, begidx, endidx)
 
     def complete_exec(self, text, line, begidx, endidx):
@@ -222,9 +232,9 @@ class Cli(cmd.Cmd):
             command = "ssh -l %s %s" % (self.user, host)
             os.system(command)
 
-    def do_stream(self, args):
-        """stream:\n  shortcut to 'mode stream'"""
-        return self.do_mode("stream")
+    def do_parallel(self, args):
+        """parallel:\n  shortcut to 'mode parallel'"""
+        return self.do_mode("parallel")
 
     def do_collapse(self, args):
         """collapse:\n  shortcut to 'mode collapse'"""
@@ -234,19 +244,50 @@ class Cli(cmd.Cmd):
         """serial:\n  shortcut to 'mode serial'"""
         return self.do_mode("serial")
 
-    def do_exec(self, args):
-        expr, cmd = args.split(None, 1)
+    def __extract_exec_args(self, args):
+        try:
+            expr, cmd = args.split(None, 1)
+        except ValueError:
+            error("Usage: <exec> <expression> <cmd>")
+            return [], args
         hosts = self.conductor.resolve(expr)
         if len(hosts) == 0:
             error("Empty hostlist")
+        return hosts, cmd
+
+    def do_exec(self, args):
+        hosts, cmd = self.__extract_exec_args(args)
+        if len(hosts) == 0:
             return
 
-        if self.mode == "stream":
-            self.run_stream(hosts, cmd)
+        if self.mode == "parallel":
+            self.run_parallel(hosts, cmd)
         elif self.mode == "collapse":
             self.run_collapse(hosts, cmd)
         elif self.mode == "serial":
             self.run_serial(hosts, cmd)
+
+    def do_p_exec(self, args):
+        """p_exec:\n force exec in parallel mode"""
+        hosts, cmd = self.__extract_exec_args(args)
+        if len(hosts) == 0:
+            return
+        self.run_parallel(hosts, cmd)
+
+    def do_s_exec(self, args):
+        """s_exec:\n force exec in serial mode"""
+        hosts, cmd = self.__extract_exec_args(args)
+        if len(hosts) == 0:
+            return
+        self.run_serial(hosts, cmd)
+
+    def do_c_exec(self, args):
+        """c_exec:\n force exec in collapse mode"""
+        hosts, cmd = self.__extract_exec_args(args)
+        if len(hosts) == 0:
+            return
+        self.run_collapse(hosts, cmd)
+
 
     def run_serial(self, hosts, cmd):
         codes = {"total": 0, "error": 0, "success": 0}
@@ -271,7 +312,7 @@ class Cli(cmd.Cmd):
         cprint(msg, "green")
         cprint(hr, "green")
 
-    def run_stream(self, hosts, cmd):
+    def run_parallel(self, hosts, cmd):
         codes = {"total": 0, "error": 0, "success": 0}
         def worker(host, cmd):
             p = Popen(["ssh", "-l", self.user, host, cmd], stdout=PIPE, stderr=PIPE)
@@ -404,3 +445,17 @@ class Cli(cmd.Cmd):
         full.sort()
         return full
 
+    def run_alias(self, args):
+        import functools
+
+
+    def do_alias(self, args):
+        alias_name, script = args.split(None, 1)
+        func_name = "do_" + alias_name
+        if hasattr(self, func_name):
+            if getattr(self, func_name) != self.run_alias:
+                error("Can't overwrite built-in command")
+                return
+        setattr(self, func_name, self.run_alias)
+        self.alias_scripts[alias_name] = script
+        export_print("Alias %s has been created" % alias_name)
