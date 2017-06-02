@@ -3,10 +3,10 @@ from gevent.select import select
 from gevent.pool import Pool
 from gevent.subprocess import Popen, PIPE
 from collections import defaultdict
-from termcolor import cprint, colored
+from termcolor import colored as term_colored
 from xclib.conductor import Conductor
 from xclib.conductor.models import Datacenter, Project, Host, Group
-import sys, fcntl, termios, struct, os, cmd
+import sys, fcntl, termios, struct, os, cmd, re
 import gnureadline as readline
 sys.modules["readline"] = readline
 readline.parse_and_bind("tab: complete")
@@ -17,6 +17,15 @@ def terminal_size():
         fcntl.ioctl(0, termios.TIOCGWINSZ,
         struct.pack('HHHH', 0, 0, 0, 0)))
     return w, h
+
+
+def colored(*args, **kwargs):
+    result = term_colored(*args, **kwargs)
+    return re.sub(r'(\x1b\[\d+m)', '\x01\g<1>\x02', result)
+
+
+def cprint(*args, **kwargs):
+    print colored(*args, **kwargs)
 
 
 def error(msg):
