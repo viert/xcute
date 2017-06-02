@@ -41,7 +41,8 @@ class Cli(cmd.Cmd):
     MODES = ("collapse", "parallel", "serial")
     DEFAULT_MODE = "collapse"
     DEFAULT_OPTIONS = {
-        "progressgbar": True
+        "progressgbar": True,
+        "ping_count": 5
     }
     HISTORY_FILE = os.path.join(os.getenv("HOME"), ".xcute_history")
 
@@ -55,6 +56,7 @@ class Cli(cmd.Cmd):
         self.ssh_threads = options["ssh_threads"]
         self.user = options.get("user") or os.getlogin()
         self.progressbar = options.get("progressbar") or self.DEFAULT_OPTIONS["progressgbar"]
+        self.ping_count = options.get("ping_count") or self.DEFAULT_OPTIONS["ping_count"]
         self.finished = False
         self.alias_scripts = {}
         if "mode" in options:
@@ -186,6 +188,9 @@ class Cli(cmd.Cmd):
     def __completion_argnum(self, line, endidx):
         argnum = len(line[:endidx].split(" ")) - 2
         return argnum
+
+    def complete_ping(self, text, line, begidx, endidx):
+        return self.complete_exec(text, line, begidx, endidx)
 
     def complete_hostlist(self, text, line, begidx, endidx):
         return self.complete_exec(text, line, begidx, endidx)
@@ -398,6 +403,64 @@ class Cli(cmd.Cmd):
         """ls:\n  list directory (using shell cmd)"""
         return self.__os_cmd("ls", args)
 
+    def ping_parallel(self, hosts, pc):
+        """ping:\n pings host (using shell cmd)"""
+        codes = {"total": 0, "error": 0, "success": 0}
+        def worker(host):
+            if pc == 0:
+                args = ["ping", host]
+            else:
+                args = ["ping", "-c", str(pc), host]
+            p = Popen(args, stdout=PIPE, stderr=PIPE)
+            while True:
+                outs, _, _ = select([p.stdout, p.stderr], [], [])
+                if p.stdout in outs:
+                    outline = p.stdout.readline()
+                else:
+                    outline = ""
+                if p.stderr in outs:
+                    errline = p.stderr.readline()
+                else:
+                    errline = ""
+
+                if outline == "" and errline == "" and p.poll() is not None:
+                    break
+
+                if outline != "":
+                    print "%s: %s" % (colored(host, "blue", attrs=["bold"]), outline.strip())
+                if errline != "":
+                    print "%s: %s" % (colored(host, "blue", attrs=["bold"]), colored(errline.strip(), "red"))
+            if p.poll() == 0:
+                codes["success"] += 1
+            else:
+                codes["error"] += 1
+            codes["total"] += 1
+
+        pool = Pool(self.ssh_threads)
+        for host in hosts:
+            pool.start(Greenlet(worker, host))
+        pool.join()
+        self.print_exec_results(codes)
+
+    def do_ping(self, args):
+        """ping:\n  pings hosts in parallel"""
+        args = args.split()
+        expr = args[0]
+        if len(args) > 1:
+            try:
+                pc = int(args[1])
+            except ValueError:
+                error("Invalid ping count: should be integer")
+                return
+        else:
+            pc = self.ping_count
+
+        hosts = self.conductor.resolve(expr)
+        if len(hosts) == 0:
+            error("Empty hostlist")
+            return
+        self.ping_parallel(hosts, pc)
+
     def do_cd(self, args):
         """cd:\n  change working directory"""
         if not args:
@@ -416,6 +479,7 @@ class Cli(cmd.Cmd):
     def do_pwd(self, args):
         """pwd:\n  print current working directory"""
         print os.getcwd()
+
 
     def __os_cmd(self, cmd, args):
         args = [cmd] + args.split()
