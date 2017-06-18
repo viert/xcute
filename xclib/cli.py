@@ -20,7 +20,14 @@ def terminal_size():
 
 
 def colored(*args, **kwargs):
+    if "sym_ignore" in kwargs:
+        sym_ignore = kwargs["sym_ignore"]
+        del(kwargs["sym_ignore"])
+    else:
+        sym_ignore = False
     result = term_colored(*args, **kwargs)
+    if not sym_ignore:
+        return result
     return re.sub(r'(\x1b\[\d+m)', '\x01\g<1>\x02', result)
 
 
@@ -80,13 +87,13 @@ class Cli(cmd.Cmd):
     @property
     def prompt(self):
         if self.mode == "collapse":
-            mode = colored("[Collapse]", "green")
+            mode = colored("[Collapse]", "green", sym_ignore=True)
         elif self.mode == "parallel":
-            mode = colored("[Parallel]", "yellow")
+            mode = colored("[Parallel]", "yellow", sym_ignore=True)
         elif self.mode == "serial":
-            mode = colored("[Serial]", "cyan")
+            mode = colored("[Serial]", "cyan", sym_ignore=True)
 
-        return "%s %s> " % (mode, colored(self.user, "blue", attrs=["bold"]))
+        return "%s %s> " % (mode, colored(self.user, "blue", attrs=["bold"], sym_ignore=True))
 
     def emptyline(self):
         pass
@@ -454,6 +461,9 @@ class Cli(cmd.Cmd):
     def do_ping(self, args):
         """ping:\n  pings hosts in parallel"""
         args = args.split()
+        if len(args) == 0:
+            error("Empty hostlist")
+            return
         expr = args[0]
         if len(args) > 1:
             try:
