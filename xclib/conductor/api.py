@@ -166,16 +166,16 @@ class Conductor(object):
         filename = "ac_" + ".".join(self.project_list) + ".pickle"
         return os.path.join(self.cache_dir, filename)
 
-    def load(self):
+    def load(self, fallback=False):
         with open(self.cache_filename) as cf:
             data = pickle.load(cf)
-            if time.time() - data["ts"] > self.cache_ttl:
+            if time.time() - data["ts"] > self.cache_ttl and not fallback:
                 raise CacheExpired()
             else:
                 self.cache = data["data"]
         with open(self.autocompleters_filename) as cf:
             data = pickle.load(cf)
-            if time.time() - data["ts"] > self.cache_ttl:
+            if time.time() - data["ts"] > self.cache_ttl and not fallback:
                 raise CacheExpired()
             else:
                 self.autocompleters = data["data"]
@@ -200,7 +200,7 @@ class Conductor(object):
             if self.print_func:
                 self.print_func(e)
                 self.print_func("Error getting data from conductor, falling back to cache")
-            self.load()
+            self.load(fallback=True)
             return
         data = json.loads(response.content)["data"]
 
