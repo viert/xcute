@@ -113,6 +113,13 @@ class Group(ConductorObject):
             hosts = hosts.union(set(ch.all_hosts))
         return hosts
 
+    @property
+    def all_tags(self):
+        tags = set(self.tags)
+        for parent in self.all_parents:
+            tags = tags.union(parent.tags)
+        return tags
+
 
 class Host(ConductorObject):
     KEY = "fqdn"
@@ -155,6 +162,11 @@ class Host(ConductorObject):
                         return True
                     pdc = pdc.parent
         return False
+
+    @property
+    def all_tags(self):
+        tags = set(self.tags)
+        return tags.union(self.group.all_tags)
 
 
 class Project(ConductorObject):

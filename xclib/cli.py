@@ -163,6 +163,49 @@ class Cli(cmd.Cmd):
         """exit:\n  exits program"""
         self.finished = True
 
+    def do_host(self, args):
+        """host:\n  shows conductor host data"""
+        args = args.split()
+        if len(args) < 0:
+            error("Usage: host <hostname>")
+            return
+
+        expr = args[0]
+        hosts = self.conductor.resolve(expr)
+        if len(hosts) != 1:
+            error("You should provide exactly one host")
+            return
+        hostname = list(hosts)[0]
+        host = self.conductor.hosts.get("fqdn", hostname)
+        if host is None:
+            error("Host %s not found" % hostname)
+            return
+
+        groups = set()
+        groups.add(host.group)
+        groups = groups.union(host.group.all_parents)
+        groups = list(groups)
+        groups.sort()
+
+        tags = list(host.all_tags)
+        tags.sort()
+
+        hr = colored("="*50, "green")
+        print hr
+        print "  %s %s" % (colored("Host:", "green"), hostname)
+        print hr
+        print
+        print "  %s %s" % (colored("Project:", "green"), host.group.project.name)
+        print
+        print colored("  Groups:", "green")
+        for group in groups:
+            print "    %s" % "%" + group.name
+        print
+        print colored("  Tags:", "green")
+        for tag in tags:
+            print "    %s" % tag
+        print
+
     def do_mode(self, args):
         """mode:\n  set exec output mode to collapse/serial/parallel"""
         if args:
@@ -204,6 +247,9 @@ class Cli(cmd.Cmd):
     def __completion_argnum(self, line, endidx):
         argnum = len(line[:endidx].split(" ")) - 2
         return argnum
+
+    def complete_host(self, text, line, begidx, endidx):
+        return self.complete_exec(text, line, begidx, endidx)
 
     def complete_ping(self, text, line, begidx, endidx):
         return self.complete_exec(text, line, begidx, endidx)
