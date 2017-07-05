@@ -6,3 +6,7 @@ It uses ssh for servers' access and can execute commands remotely in three diffe
 ## installation
 
 `pip install git+https://github.com/viert/xcute`
+
+## Ubuntu installation
+
+`apt install python-termcolor python-gevent python-requests`
