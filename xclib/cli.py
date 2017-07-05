@@ -7,7 +7,12 @@ from termcolor import colored as term_colored
 from xclib.conductor import Conductor
 from xclib.conductor.models import Datacenter, Project, Host, Group
 import sys, fcntl, termios, struct, os, cmd, re
-import gnureadline as readline
+
+try:
+    import gnureadline as readline
+except:
+    import readline
+
 sys.modules["readline"] = readline
 readline.parse_and_bind("tab: complete")
 
