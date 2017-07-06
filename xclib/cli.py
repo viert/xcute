@@ -163,7 +163,7 @@ class Cli(cmd.Cmd):
         """exit:\n  exits program"""
         self.finished = True
 
-    def do_host(self, args):
+    def do_describe(self, args):
         """host:\n  shows conductor host data"""
         args = args.split()
         if len(args) < 0:
@@ -248,7 +248,7 @@ class Cli(cmd.Cmd):
         argnum = len(line[:endidx].split(" ")) - 2
         return argnum
 
-    def complete_host(self, text, line, begidx, endidx):
+    def complete_describe(self, text, line, begidx, endidx):
         return self.complete_exec(text, line, begidx, endidx)
 
     def complete_ping(self, text, line, begidx, endidx):
