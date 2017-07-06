@@ -10,7 +10,7 @@ import sys, fcntl, termios, struct, os, cmd, re
 
 try:
     import gnureadline as readline
-except:
+except ImportError:
     import readline
 
 sys.modules["readline"] = readline
