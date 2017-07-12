@@ -387,10 +387,24 @@ class Cli(cmd.Cmd):
         cprint(msg, "green")
         cprint(hr, "green")
 
+    def get_parallel_ssh_options(self, host, cmd):
+        return [
+            "ssh",
+            "-l",
+            self.user,
+            "-o",
+            "PubkeyAuthentication=yes",
+            "-o",
+            "PasswordAuthentication=no",
+            host,
+            cmd
+        ]
+
     def run_parallel(self, hosts, cmd):
         codes = {"total": 0, "error": 0, "success": 0}
+
         def worker(host, cmd):
-            p = Popen(["ssh", "-l", self.user, host, cmd], stdout=PIPE, stderr=PIPE)
+            p = Popen(self.get_parallel_ssh_options(host, cmd), stdout=PIPE, stderr=PIPE)
             while True:
                 outs, _, _ = select([p.stdout, p.stderr], [], [])
                 if p.stdout in outs:
@@ -431,8 +445,9 @@ class Cli(cmd.Cmd):
 
         codes = {"total": 0, "error": 0, "success": 0}
         outputs = defaultdict(list)
+
         def worker(host, cmd):
-            p = Popen(["ssh", "-l", self.user, host, cmd], stdout=PIPE, stderr=PIPE)
+            p = Popen(self.get_parallel_ssh_options(host, cmd), stdout=PIPE, stderr=PIPE)
             o, e = p.communicate()
             outputs[o].append(host)
             if p.poll() == 0:
