@@ -14,7 +14,7 @@ if __name__ == '__main__':
         "user": os.getlogin(),
         "cache_dir": os.path.join(os.getenv("HOME"), ".xcute_cache"),
         "conductor_host": "localhost",
-        "conductor_port": "5000",
+        "conductor_port": "80",
         "ssh_threads": "10",
         "ping_count": "5"
     }
