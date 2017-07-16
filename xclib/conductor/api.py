@@ -115,6 +115,9 @@ class Conductor(object):
         self.cache = None
         self.autocompleters = None
 
+        if not os.path.isdir(self.cache_dir):
+            os.makedirs(self.cache_dir)
+
         project_list = ",".join(projects)
         self.ex_url = "http://%s:%d/api/v1/open/executer_data?projects=%s" % (host, port, project_list)
 
@@ -200,7 +203,12 @@ class Conductor(object):
             if self.print_func:
                 self.print_func(e)
                 self.print_func("Error getting data from conductor, falling back to cache")
-            self.load(fallback=True)
+            try:
+                self.load(fallback=True)
+            except IOError:
+                # Here we don't have any cache and don't have a conductor connection
+                self.print_func("No conductor connection and no cache found, running xcute for the first time? Please configure xcute properly editing ~/.xcute.conf file. An example has been already there.")
+                return
             return
         data = json.loads(response.content)["data"]
 

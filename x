@@ -6,6 +6,19 @@ import os
 import re
 import sys
 
+DEFAULT_CONFIG = """
+[main]
+# Conductor configuration
+conductor_host = localhost
+conductor_port = 80
+project_list = 
+
+# Executer
+user = %s
+ssh_threads = 50
+ping_count = 5
+""" % os.getlogin()
+
 if __name__ == '__main__':
     DEFAULT_OPTIONS = {
         "progressbar": "on",
@@ -15,7 +28,7 @@ if __name__ == '__main__':
         "cache_dir": os.path.join(os.getenv("HOME"), ".xcute_cache"),
         "conductor_host": "localhost",
         "conductor_port": "80",
-        "ssh_threads": "10",
+        "ssh_threads": "50",
         "ping_count": "5"
     }
     cp = ConfigParser(defaults=DEFAULT_OPTIONS)
@@ -24,39 +37,39 @@ if __name__ == '__main__':
     options = {}
     projects = set()
 
-    try:
-        with open(cfilename) as cf:
-            try:
-                cp.readfp(cf)
-                options["progressbar"] = cp.getboolean("main", "progressbar")
-                options["mode"] = cp.get("main", "mode")
-                options["user"] = cp.get("main", "user")
-                options["cache_dir"] = cp.get("main", "cache_dir")
-                options["conductor_host"] = cp.get("main", "conductor_host")
-                options["conductor_port"] = cp.getint("main", "conductor_port")
-                options["ssh_threads"] = cp.getint("main", "ssh_threads")
-                options["ping_count"] = cp.getint("main", "ping_count")
-                p_names = cp.get("main", "projects")
-                if p_names == "":
-                    error("you should include at least one project into 'projects' variable in config")
+    while True:
+        try:
+            with open(cfilename) as cf:
+                try:
+                    cp.readfp(cf)
+                    options["progressbar"] = cp.getboolean("main", "progressbar")
+                    options["mode"] = cp.get("main", "mode")
+                    options["user"] = cp.get("main", "user")
+                    options["cache_dir"] = cp.get("main", "cache_dir")
+                    options["conductor_host"] = cp.get("main", "conductor_host")
+                    options["conductor_port"] = cp.getint("main", "conductor_port")
+                    options["ssh_threads"] = cp.getint("main", "ssh_threads")
+                    options["ping_count"] = cp.getint("main", "ping_count")
+                    p_names = cp.get("main", "projects")
+
+                    for p_name in re.split(r"\s*,\s*", p_names):
+                        projects.add(p_name)
+
+                    options["projects"] = list(projects)
+                    break
+
+                except Exception as e:
+                    error("invalid configuration file: %s" % e.message)
                     sys.exit(1)
 
-                for p_name in re.split(r"\s*,\s*", p_names):
-                    projects.add(p_name)
+        except (OSError, IOError):
+            with open(cfilename, "w") as cf:
+                cf.write(DEFAULT_CONFIG)
+                continue
 
-                options["projects"] = list(projects)
-
-            except Exception as e:
-                error("invalid configuration file: %s" % e.message)
-                sys.exit(1)
-
-    except (OSError, IOError):
-        error("no configuration file can be read, can't start with empty project list")
-        sys.exit(1)
-
-    except Exception as e:
-        error("Error reading configuration: %s" % e.message)
-        sys.exit(1)
+        except Exception as e:
+            error("Error reading configuration: %s" % e.message)
+            sys.exit(1)
 
     parser = ArgumentParser(description="xcute conductor-backed execution tool")
     parser.add_argument("-s", "--stream", dest="mode", action="store_const", const="stream", help="set stream mode")
