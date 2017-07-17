@@ -469,7 +469,7 @@ class Cli(cmd.Cmd):
         self.print_exec_results(codes)
         print
         for output, hosts in outputs.items():
-            msg = " %s    " % ', '.join(hosts)
+            msg = " %s    " % ','.join(hosts)
             table_width = min([len(msg) + 2, terminal_size()[0]])
             cprint("=" * table_width, "blue", attrs=["bold"])
             cprint(msg, "blue", attrs=["bold"])
