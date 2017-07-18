@@ -448,7 +448,19 @@ class Cli(cmd.Cmd):
 
         def worker(host, cmd):
             p = Popen(self.get_parallel_ssh_options(host, cmd), stdout=PIPE, stderr=PIPE)
-            o, e = p.communicate()
+            o = ""
+            while True:
+                outs, _, _ = select([p.stdout, p.stderr], [], [])
+                outline = errline = ""
+                if p.stdout in outs:
+                    outline = p.stdout.readline()
+                if p.stderr in outs:
+                    errline = p.stderr.readline()
+                o += outline + errline
+
+                if outline == "" and errline == "" and p.poll() is not None:
+                    break
+
             outputs[o].append(host)
             if p.poll() == 0:
                 codes["success"] += 1
