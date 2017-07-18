@@ -10,3 +10,8 @@ It uses ssh for servers' access and can execute commands remotely in three diffe
 ## Ubuntu installation
 
 `apt install python-termcolor python-gevent python-requests`
+
+## Docker run
+`docker build -t xcute .`
+
+`docker run --rm -it --env CONDUCTOR_HOST="[conductor_host]" --env PROJECT_LIST="[project_list]" --env CONDUCTOR_USER="[user]" xcute`
