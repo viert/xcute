@@ -80,6 +80,7 @@ class Cli(cmd.Cmd):
         self.ping_count = options.get("ping_count") or self.DEFAULT_OPTIONS["ping_count"]
         self.finished = False
         self.alias_scripts = {}
+        self.default_remote_dir = options.get("default_remote_dir") or "/tmp"
         if "mode" in options:
             if not options["mode"] in self.MODES:
                 error("invalid mode '%s'. use 'parallel', 'collapse' or 'serial" % options["mode"])
@@ -363,7 +364,6 @@ class Cli(cmd.Cmd):
             return
         self.run_collapse(hosts, cmd)
 
-
     def run_serial(self, hosts, cmd):
         codes = {"total": 0, "error": 0, "success": 0}
         align_len = len(max(hosts, key=len)) + len(self.user) + len(cmd) + 24
@@ -380,7 +380,8 @@ class Cli(cmd.Cmd):
 
         self.print_exec_results(codes)
 
-    def print_exec_results(self, codes):
+    @staticmethod
+    def print_exec_results(codes):
         msg = " Hosts processed: %d, success: %d, error: %d    " % (codes["total"], codes["success"], codes["error"])
         hr = "=" * len(msg)
         cprint(hr, "green")
@@ -577,6 +578,77 @@ class Cli(cmd.Cmd):
         """pwd:\n  print current working directory"""
         print os.getcwd()
 
+    def do_cat(self, args):
+        return self.__os_cmd("cat", args)
+
+    def complete_cat(self, text, line, begidx, endidx):
+        return self.__file_completion(text)
+
+    def do_distribute(self, args):
+        """distribute:\n  copy local file to a group of servers into a specified directory"""
+        args = args.split()
+        if len(args) < 2:
+            error("Usage: distribute <conductor_expression> <local_filename> [remote_dir=%s]" % self.default_remote_dir)
+            return
+        expr, filename = args[:2]
+        hosts = self.conductor.resolve(expr)
+        if len(hosts) == 0:
+            error("Empty hostlist")
+            return
+        if not os.path.isfile(filename):
+            error("%s is not a file or doesn't exist" % filename)
+            return
+        if len(args) > 2:
+            remote_dir = args[2]
+        else:
+            remote_dir = self.default_remote_dir
+
+        results = {
+            "error": [],
+            "success": []
+        }
+
+        errors = defaultdict(list)
+
+        def worker(host):
+            p = Popen([
+                "scp",
+                "-B", # prevents asking for passwords
+                filename,
+                "%s@%s:%s" % (self.user, host, remote_dir)
+            ], stdout=PIPE, stderr=PIPE)
+            o, e = p.communicate()
+            if p.poll() == 0:
+                results["success"].append(host)
+            else:
+                results["error"].append(host)
+                errors[e].append(host)
+
+        pool = Pool()
+        for host in hosts:
+            pool.start(Greenlet(worker, host))
+        pool.join()
+        if len(results["success"]) > 0:
+            msg = "Successfully distributed to %d hosts" % len(results["success"])
+            cprint(msg, "green")
+        if len(results["error"]) > 0:
+            cprint("There were errors distributing file", "red")
+            for output, hosts in errors.items():
+                msg = " %s    " % ','.join(hosts)
+                table_width = min([len(msg) + 2, terminal_size()[0]])
+                cprint("=" * table_width, "blue", attrs=["bold"])
+                cprint(msg, "blue", attrs=["bold"])
+                cprint("=" * table_width, "blue", attrs=["bold"])
+                print output
+
+    def complete_distribute(self, text, line, begidx, endidx):
+        argnum = self.__completion_argnum(line, endidx)
+        if argnum == 0:
+            return self.complete_exec(text, line, begidx, endidx)
+        elif argnum == 1:
+            return self.__file_completion(text)
+        else:
+            return []
 
     def __os_cmd(self, cmd, args):
         args = [cmd] + args.split()

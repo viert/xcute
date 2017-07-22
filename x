@@ -20,6 +20,7 @@ projects = {project_list}
 user = {user}
 ssh_threads = 50
 ping_count = 5
+default_remote_dir = /tmp
 """.format(conductor_host=os.environ.get('CONDUCTOR_HOST', 'localhost'),
            project_list=os.environ.get('PROJECT_LIST', ""),
            user=os.environ.get('CONDUCTOR_USER', os.getlogin()))
@@ -34,7 +35,8 @@ if __name__ == '__main__':
         "conductor_host": "localhost",
         "conductor_port": "80",
         "ssh_threads": "50",
-        "ping_count": "5"
+        "ping_count": "5",
+        "default_remote_dir": "/tmp"
     }
     cp = ConfigParser(defaults=DEFAULT_OPTIONS)
 
@@ -55,6 +57,7 @@ if __name__ == '__main__':
                     options["conductor_port"] = cp.getint("main", "conductor_port")
                     options["ssh_threads"] = cp.getint("main", "ssh_threads")
                     options["ping_count"] = cp.getint("main", "ping_count")
+                    options["default_remote_dir"] = cp.get("main", "default_remote_dir")
                     p_names = cp.get("main", "projects")
 
                     for p_name in re.split(r"\s*,\s*", p_names):
