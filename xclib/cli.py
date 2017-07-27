@@ -126,7 +126,7 @@ class Cli(cmd.Cmd):
         try:
           readline.read_history_file(self.HISTORY_FILE)
         except (OSError, IOError), e:
-          warn("Can't read history file: %s" % e.message)
+          warn("Can't read history file")
 
     def postloop(self):
         try:
@@ -462,6 +462,8 @@ class Cli(cmd.Cmd):
                 if outline == "" and errline == "" and p.poll() is not None:
                     break
 
+            if o == "":
+                o = colored("[ No Output ]\n", "yellow")
             outputs[o].append(host)
             if p.poll() == 0:
                 codes["success"] += 1
@@ -598,6 +600,7 @@ class Cli(cmd.Cmd):
         if not os.path.isfile(filename):
             error("%s is not a file or doesn't exist" % filename)
             return
+
         if len(args) > 2:
             remote_dir = args[2]
         else:
@@ -605,10 +608,17 @@ class Cli(cmd.Cmd):
 
         results = {
             "error": [],
-            "success": []
+            "success": [],
+            "total": 0
         }
-
         errors = defaultdict(list)
+
+        progress = None
+        if self.progressbar:
+            from progressbar import ProgressBar, Percentage, Bar, ETA, FileTransferSpeed
+            progress = ProgressBar(
+                widgets=["Running: ", Percentage(), ' ', Bar(marker='.'), ' ', ETA(), ' ', FileTransferSpeed()],
+                maxval=len(hosts))
 
         def worker(host):
             p = Popen([
@@ -624,10 +634,21 @@ class Cli(cmd.Cmd):
                 results["error"].append(host)
                 errors[e].append(host)
 
+            results["total"] += 1
+            if self.progressbar:
+                progress.update(results["total"])
+
+        if self.progressbar:
+            progress.start()
+
         pool = Pool()
         for host in hosts:
             pool.start(Greenlet(worker, host))
         pool.join()
+
+        if self.progressbar:
+            progress.finish()
+
         if len(results["success"]) > 0:
             msg = "Successfully distributed to %d hosts" % len(results["success"])
             cprint(msg, "green")
