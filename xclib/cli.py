@@ -134,6 +134,9 @@ class Cli(cmd.Cmd):
         except (OSError, IOError) as e:
             warn("Can't write history file: %s" % e.message)
 
+    def do_shell(self, s):
+        os.system(s)
+
     def __on_off_completion(self, text):
         return [x for x in ['on', 'off'] if x.startswith(text.lower())]
 
@@ -172,7 +175,7 @@ class Cli(cmd.Cmd):
     def do_describe(self, args):
         """host:\n  shows conductor host data"""
         args = args.split()
-        if len(args) < 0:
+        if len(args) <= 0:
             error("Usage: host <hostname>")
             return
 
