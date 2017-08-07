@@ -1,3 +1,4 @@
+from __future__ import print_function
 from gevent import Greenlet
 from gevent.select import select
 from gevent.pool import Pool
@@ -7,6 +8,7 @@ from termcolor import colored as term_colored
 from xclib.conductor import Conductor
 from xclib.conductor.models import Datacenter, Project, Host, Group
 import sys, fcntl, termios, struct, os, cmd, re
+
 
 try:
     import gnureadline as readline
@@ -193,27 +195,27 @@ class Cli(cmd.Cmd):
         groups = set()
         groups.add(host.group)
         groups = groups.union(host.group.all_parents)
-        groups = list(groups)
+        groups = [group.name for group in groups]
         groups.sort()
 
         tags = list(host.all_tags)
         tags.sort()
 
         hr = colored("="*50, "green")
-        print hr
-        print "  %s %s" % (colored("Host:", "green"), hostname)
-        print hr
-        print
-        print "  %s %s" % (colored("Project:", "green"), host.group.project.name)
-        print
-        print colored("  Groups:", "green")
+        print(hr)
+        print('  {host} {hostname}'.format(host=colored("Host:", "green"), hostname=hostname))
+        print(hr + "\n")
+        print('  {project} {project_name}\n'.format(project=colored("Project:", "green"),
+                                                    project_name=host.group.project.name))
+        print('  {}'.format(colored("Groups:", "green")))
         for group in groups:
-            print "    %s" % "%" + group.name
-        print
-        print colored("  Tags:", "green")
+            print('    {group}'.format(group=group))
+        print("")
+        print('  {}'.format(colored("Tags:", "green")))
         for tag in tags:
-            print "    %s" % tag
-        print
+            print('    {tag}'.format(tag=tag))
+        print("")
+
 
     def do_mode(self, args):
         """mode:\n  set exec output mode to collapse/serial/parallel"""
