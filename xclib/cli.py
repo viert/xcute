@@ -39,7 +39,7 @@ def colored(*args, **kwargs):
 
 
 def cprint(*args, **kwargs):
-    print colored(*args, **kwargs)
+    print(colored(*args, **kwargs))
 
 
 def error(msg):
@@ -113,7 +113,7 @@ class Cli(cmd.Cmd):
         try:
             cmd.Cmd.cmdloop(self)
         except KeyboardInterrupt:
-            print
+            print()
             self.cmdloop()
 
     def preloop(self):
@@ -154,7 +154,7 @@ class Cli(cmd.Cmd):
         if args:
             mode = args.split()[0].lower()
             if mode not in ("on", "off"):
-                print "Usage: progressbar [on|off]"
+                print("Usage: progressbar [on|off]")
                 return
             if mode == "on":
                 self.progressbar = True
@@ -167,7 +167,7 @@ class Cli(cmd.Cmd):
 
     def do_EOF(self, args):
         """exit:\n  exits program"""
-        print
+        print()
         self.finished = True
 
     def do_exit(self, args):
@@ -249,11 +249,11 @@ class Cli(cmd.Cmd):
         if hrlen < 10 + len(expr): hrlen = 10 + len(expr)
         hr = colored("=" * hrlen, "green")
 
-        print hr
-        print "Hostlist: " + expr
-        print hr
+        print(hr)
+        print("Hostlist: " + expr)
+        print(hr)
         for host in hosts:
-            print host
+            print(host)
 
     def __completion_argnum(self, line, endidx):
         argnum = len(line[:endidx].split(" ")) - 2
@@ -426,9 +426,9 @@ class Cli(cmd.Cmd):
                     break
 
                 if outline != "":
-                    print "%s: %s" % (colored(host, "blue", attrs=["bold"]), outline.strip())
+                    print("%s: %s" % (colored(host, "blue", attrs=["bold"]), outline.strip()))
                 if errline != "":
-                    print "%s: %s" % (colored(host, "blue", attrs=["bold"]), colored(errline.strip(), "red"))
+                    print("%s: %s" % (colored(host, "blue", attrs=["bold"]), colored(errline.strip(), "red")))
             if p.poll() == 0:
                 codes["success"] += 1
             else:
@@ -487,14 +487,14 @@ class Cli(cmd.Cmd):
         if self.progressbar:
             progress.finish()
         self.print_exec_results(codes)
-        print
+        print()
         for output, hosts in outputs.items():
             msg = " %s    " % ','.join(hosts)
             table_width = min([len(msg) + 2, terminal_size()[0]])
             cprint("=" * table_width, "blue", attrs=["bold"])
             cprint(msg, "blue", attrs=["bold"])
             cprint("=" * table_width, "blue", attrs=["bold"])
-            print output
+            print(output)
 
     def do_user(self, args):
         """user:\n  set user"""
@@ -529,9 +529,9 @@ class Cli(cmd.Cmd):
                     break
 
                 if outline != "":
-                    print "%s: %s" % (colored(host, "blue", attrs=["bold"]), outline.strip())
+                    print("%s: %s" % (colored(host, "blue", attrs=["bold"]), outline.strip()))
                 if errline != "":
-                    print "%s: %s" % (colored(host, "blue", attrs=["bold"]), colored(errline.strip(), "red"))
+                    print("%s: %s" % (colored(host, "blue", attrs=["bold"]), colored(errline.strip(), "red")))
             if p.poll() == 0:
                 codes["success"] += 1
             else:
@@ -583,7 +583,7 @@ class Cli(cmd.Cmd):
 
     def do_pwd(self, args):
         """pwd:\n  print current working directory"""
-        print os.getcwd()
+        print(os.getcwd())
 
     def do_cat(self, args):
         return self.__os_cmd("cat", args)
@@ -665,7 +665,7 @@ class Cli(cmd.Cmd):
                 cprint("=" * table_width, "blue", attrs=["bold"])
                 cprint(msg, "blue", attrs=["bold"])
                 cprint("=" * table_width, "blue", attrs=["bold"])
-                print output
+                print(output)
 
     def complete_distribute(self, text, line, begidx, endidx):
         argnum = self.__completion_argnum(line, endidx)
