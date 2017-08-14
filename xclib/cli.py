@@ -307,7 +307,11 @@ class Cli(cmd.Cmd):
 
     def do_ssh(self, args):
         """ssh:\n connect to host(s) via ssh"""
-        hosts = self.conductor.resolve(args.split()[0])
+        args = args.split()
+        if len(args) == 0:
+            cprint("Empty hostlist", "red")
+            return
+        hosts = self.conductor.resolve(args[0])
         for host in hosts:
             cprint("=== ssh %s@%s ===" % (self.user, host), "green")
             command = "ssh -l %s %s" % (self.user, host)
