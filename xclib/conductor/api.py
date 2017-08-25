@@ -5,6 +5,7 @@ import requests
 import cPickle as pickle
 from collections import defaultdict
 from xclib.conductor.models import Datacenter, Project, Group, Host
+from xclib.conductor.parser import ConductorExpression
 
 
 class CacheExpired(Exception):
@@ -75,8 +76,16 @@ class Api(object):
         else:
             return cache.get(value)
 
+    def get_cache(self, key):
+        return self.__c.cache[self.CLASS_KEY][key]
+
+
 class ProjectApi(Api):
     CLASS_KEY = Project
+
+    def all(self):
+        cache = self.get_cache(Project.KEY)
+        return set(cache.values())
 
 
 class DatacenterApi(Api):
@@ -103,11 +112,13 @@ class Conductor(object):
                  port=DEFAULT_PORT,
                  cache_dir=DEFAULT_CACHE_DIR,
                  drop_cache=False,
+                 use_recursive_fields=False,
                  print_func=None):
         self.print_func = print_func
-        self.cache_ttl=cache_ttl
-        self.project_list = projects
+        self.cache_ttl = cache_ttl
+        self.use_recursive_fields = use_recursive_fields
         self.cache_dir = cache_dir
+        self.project_list = projects
         self.datacenters = DatacenterApi(self)
         self.projects = ProjectApi(self)
         self.groups = GroupApi(self)
@@ -120,6 +131,8 @@ class Conductor(object):
 
         project_list = ",".join(projects)
         self.ex_url = "http://%s:%d/api/v1/open/executer_data?projects=%s" % (host, port, project_list)
+        if self.use_recursive_fields:
+            self.ex_url += "&recursive=true"
 
         if drop_cache:
             self.fetch()
@@ -156,17 +169,20 @@ class Conductor(object):
             Datacenter: Autocompleter(),
             Group: Autocompleter(),
             Host: Autocompleter(),
-            Project: Autocompleter()
+            Project: Autocompleter(),
+            "tags": Autocompleter(),
+            "field_keys": Autocompleter(),
+            "field_values": Autocompleter()
         }
 
     @property
     def cache_filename(self):
-        filename = "cache_" + ".".join(self.project_list) + ".pickle"
+        filename = "cache_" + ".".join(self.project_list) + Host.STORE_VERSION + ".pickle"
         return os.path.join(self.cache_dir, filename)
 
     @property
     def autocompleters_filename(self):
-        filename = "ac_" + ".".join(self.project_list) + ".pickle"
+        filename = "ac_" + ".".join(self.project_list) + Host.STORE_VERSION + ".pickle"
         return os.path.join(self.cache_dir, filename)
 
     def load(self, fallback=False):
@@ -236,6 +252,15 @@ class Conductor(object):
             self.cache[Host]["_id"][host._id] = host
             self.cache[Host][Host.KEY][h_params[Host.KEY]] = host
             self.autocompleters[Host].add(h_params[Host.KEY])
+            if self.use_recursive_fields:
+                if "tags" in h_params and len(h_params["all_tags"]) > 0:
+                    for tag in h_params["all_tags"]:
+                        self.autocompleters["tags"].add(tag)
+                if "custom_fields" in h_params and len(h_params["all_custom_fields"]) > 0:
+                    for field in h_params["all_custom_fields"]:
+                        self.autocompleters["field_keys"].add(field["key"]+"=")
+                        self.autocompleters["field_values"].add(field["value"])
+
             if host.group_id is not None:
                 self.cache[Host]["group_id"][host.group_id].add(host)
 
@@ -246,58 +271,57 @@ class Conductor(object):
         result_hosts = set()
 
         for token in tokens:
+            parsed = ConductorExpression(token)
             hosts = set()
-            exclude = False
             rawhost = None
 
-            try:
-                dci = token.index("@")
-                dcfilter = token[dci+1:]
-                token = token[:dci]
-            except:
-                dcfilter = None
-
-            # leading "-" is for excluding
-            if token.startswith("-"):
-                exclude = True
-                token = token[1:]
-
-            # ignoring leading "+"
-            if token.startswith("+"):
-                token = token[1:]
-
-            if token.startswith("%"):
-                group = self.groups.get(Group.KEY, token[1:])
+            if parsed.token.type == "group":
+                group = self.groups.get(Group.KEY, parsed.token.data)
                 if group is not None:
                     hosts = set(group.all_hosts)
-            elif token.startswith("*"):
-                project = self.projects.get(Project.KEY, token[1:])
+            elif parsed.token.type == "project":
+                project = self.projects.get(Project.KEY, parsed.token.data)
                 if project:
                     for group in project.groups:
                         hosts = hosts.union(group.all_hosts)
+            elif parsed.token.type == "entire":
+                projects = self.projects.all()
+                for project in projects:
+                    for group in project.groups:
+                        hosts = hosts.union(group.all_hosts)
             else:
-                host = self.hosts.get(Host.KEY, token)
+                host = self.hosts.get(Host.KEY, parsed.token.data)
                 if host:
                     hosts.add(host)
                 else:
-                    # host's not in conductor database, no way to check its belonging to dc
-                    rawhost = token
+                    rawhost = parsed.token.data
 
             if len(hosts) > 0:
-                if dcfilter:
-                    hosts = set([h for h in hosts if h.in_datacenter(dcfilter)])
-                if exclude:
+                if parsed.datacenter_filter:
+                    hosts = set([h for h in hosts if h.in_datacenter(parsed.datacenter_filter)])
+                if parsed.tags_filter:
+                    hosts = set([h for h in hosts
+                                 if set(h.all_tags).intersection(parsed.tags_filter) == set(parsed.tags_filter)])
+                if parsed.fields_filter:
+                    for key, value in parsed.fields_filter.items():
+                        field_data = { "key": key, "value": value }
+                        hosts = set([h for h in hosts if field_data in h.all_custom_fields])
+                if parsed.exclude:
                     result_hosts = result_hosts.difference(set([x.fqdn for x in hosts]))
                 else:
                     result_hosts = result_hosts.union(set([x.fqdn for x in hosts]))
 
             if rawhost:
-                if exclude:
-                    try:
-                        result_hosts.remove(rawhost)
-                    except:
-                        pass
-                else:
-                    result_hosts.add(rawhost)
+                # raw hosts are always filtered out if any filters exist
+                if parsed.datacenter_filter is None and \
+                                parsed.fields_filter is None and \
+                                parsed.tags_filter is None:
+                    if parsed.exclude:
+                        try:
+                            result_hosts.remove(rawhost)
+                        except:
+                            pass
+                    else:
+                        result_hosts.add(rawhost)
 
         return result_hosts

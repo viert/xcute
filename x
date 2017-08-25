@@ -36,7 +36,8 @@ if __name__ == '__main__':
         "conductor_port": "80",
         "ssh_threads": "50",
         "ping_count": "5",
-        "default_remote_dir": "/tmp"
+        "default_remote_dir": "/tmp",
+        "use_recursive_fields": "off"
     }
     cp = ConfigParser(defaults=DEFAULT_OPTIONS)
 
@@ -58,6 +59,7 @@ if __name__ == '__main__':
                     options["ssh_threads"] = cp.getint("main", "ssh_threads")
                     options["ping_count"] = cp.getint("main", "ping_count")
                     options["default_remote_dir"] = cp.get("main", "default_remote_dir")
+                    options["use_recursive_fields"] = cp.getboolean("main", "use_recursive_fields")
                     p_names = cp.get("main", "projects")
 
                     for p_name in re.split(r"\s*,\s*", p_names):

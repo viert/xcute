@@ -1,6 +1,8 @@
 
 class ConductorObject(object):
 
+    STORE_VERSION = "1.0.5"
+
     KEY = None
     FIELDS = []
 
@@ -69,7 +71,6 @@ class Group(ConductorObject):
         "project_id",
         "parent_ids",
         "child_ids",
-        "tags",
     ]
 
     def __init__(self, conductor, **kwargs):
@@ -113,13 +114,6 @@ class Group(ConductorObject):
             hosts = hosts.union(set(ch.all_hosts))
         return hosts
 
-    @property
-    def all_tags(self):
-        tags = set(self.tags)
-        for parent in self.all_parents:
-            tags = tags.union(parent.tags)
-        return tags
-
 
 class Host(ConductorObject):
     KEY = "fqdn"
@@ -130,7 +124,8 @@ class Host(ConductorObject):
         "group_id",
         "datacenter_id",
         "description",
-        "tags",
+        "all_tags",
+        "all_custom_fields",
         "created_at",
         "updated_at",
     ]
@@ -162,12 +157,6 @@ class Host(ConductorObject):
                         return True
                     pdc = pdc.parent
         return False
-
-    @property
-    def all_tags(self):
-        tags = set(self.tags)
-        return tags.union(self.group.all_tags)
-
 
 class Project(ConductorObject):
     KEY = "name"

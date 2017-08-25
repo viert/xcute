@@ -2,10 +2,10 @@ from setuptools import setup, find_packages
 
 setup(
     name="Xcute",
-    version="0.7.17",
+    version="0.8.0a",
     packages=find_packages(),
     scripts=["x"],
-    install_requires=["gevent", "requests", "termcolor", "progressbar", "gnureadline"],
+    install_requires=["gevent", "requests", "termcolor", "progressbar", "gnureadline", "pyparsing"],
     author="Pavel Vorobyov",
     author_email="aquavitale@yandex.ru",
     description="Parallel execution command-line tool",

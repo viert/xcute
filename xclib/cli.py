@@ -3,6 +3,7 @@ from gevent import Greenlet
 from gevent.select import select
 from gevent.pool import Pool
 from gevent.subprocess import Popen, PIPE
+from pyparsing import ParseException
 from collections import defaultdict
 from termcolor import colored as term_colored
 from xclib.conductor import Conductor
@@ -17,7 +18,7 @@ except ImportError:
 
 sys.modules["readline"] = readline
 readline.parse_and_bind("tab: complete")
-
+readline.set_completer_delims(readline.get_completer_delims().replace(":", ""))
 
 def terminal_size():
     h, w, hp, wp = struct.unpack('HHHH',
@@ -75,6 +76,7 @@ class Cli(cmd.Cmd):
                                    host=options["conductor_host"],
                                    port=options["conductor_port"],
                                    cache_dir=options["cache_dir"],
+                                   use_recursive_fields=options["use_recursive_fields"],
                                    print_func=export_print)
         self.ssh_threads = options["ssh_threads"]
         self.user = options.get("user") or os.getlogin()
@@ -134,7 +136,7 @@ class Cli(cmd.Cmd):
         try:
             readline.write_history_file(self.HISTORY_FILE)
         except (OSError, IOError) as e:
-            warn("Can't write history file: %s" % e.message)
+            warn("Can't write history file: %s" % str(e))
 
     def do_shell(self, s):
         os.system(s)
@@ -182,7 +184,12 @@ class Cli(cmd.Cmd):
             return
 
         expr = args[0]
-        hosts = self.conductor.resolve(expr)
+        try:
+            hosts = self.conductor.resolve(expr)
+        except ParseException as e:
+            error("Invalid conductor expression: %s" % str(e))
+            return
+
         if len(hosts) != 1:
             error("You should provide exactly one host")
             return
@@ -201,6 +208,8 @@ class Cli(cmd.Cmd):
         tags = list(host.all_tags)
         tags.sort()
 
+        fields = list(host.all_custom_fields)
+
         hr = colored("="*50, "green")
         print(hr)
         print('  {host} {hostname}'.format(host=colored("Host:", "green"), hostname=hostname))
@@ -215,7 +224,10 @@ class Cli(cmd.Cmd):
         for tag in tags:
             print('    {tag}'.format(tag=tag))
         print("")
-
+        print('  {}'.format(colored("Custom Fields:", "green")))
+        for cf in fields:
+            print('    {key} = {val}'.format(key=cf["key"], val=cf["value"]))
+        print("")
 
     def do_mode(self, args):
         """mode:\n  set exec output mode to collapse/serial/parallel"""
@@ -239,7 +251,12 @@ class Cli(cmd.Cmd):
             return
 
         expr = args[0]
-        hosts = list(self.conductor.resolve(expr))
+        try:
+            hosts = list(self.conductor.resolve(expr))
+        except ParseException as e:
+            error("Invalid conductor expression: %s" % str(e))
+            return
+
         if len(hosts) == 0:
             cprint("Empty list", "red")
             return
@@ -286,6 +303,21 @@ class Cli(cmd.Cmd):
             datacenters = self.conductor.autocompleters[Datacenter].complete(dcpref)
             return list(datacenters)
 
+        if line[begidx-1] == "#":
+            tagpref = text
+            completions = self.conductor.autocompleters["tags"].complete(tagpref)
+            return list(completions)
+
+        if line[begidx-1] == "[":
+            cfkeypref = text
+            completions = self.conductor.autocompleters["field_keys"].complete(cfkeypref)
+            return list(completions)
+
+        if line[begidx-1] == "=":
+            cfvaluepref = text
+            completions = self.conductor.autocompleters["field_values"].complete(cfvaluepref)
+            return list(completions)
+
         prefix = ''
 
         if text.startswith('-'):
@@ -311,7 +343,15 @@ class Cli(cmd.Cmd):
         if len(args) == 0:
             cprint("Empty hostlist", "red")
             return
-        hosts = self.conductor.resolve(args[0])
+        try:
+            hosts = self.conductor.resolve(args[0])
+        except ParseException as e:
+            error("Invalid conductor expression: %s" % str(e))
+            return
+
+        if len(hosts) == 0:
+            error("Empty hostlist")
+            return
         for host in hosts:
             cprint("=== ssh %s@%s ===" % (self.user, host), "green")
             command = "ssh -l %s %s" % (self.user, host)
@@ -335,7 +375,12 @@ class Cli(cmd.Cmd):
         except ValueError:
             error("Usage: <exec> <expression> <cmd>")
             return [], args
-        hosts = self.conductor.resolve(expr)
+        try:
+            hosts = self.conductor.resolve(expr)
+        except ParseException as e:
+            error("Invalid conductor expression: %s" % str(e))
+            return
+
         if len(hosts) == 0:
             error("Empty hostlist")
         return hosts, cmd
@@ -564,7 +609,12 @@ class Cli(cmd.Cmd):
         else:
             pc = self.ping_count
 
-        hosts = self.conductor.resolve(expr)
+        try:
+            hosts = self.conductor.resolve(expr)
+        except ParseException as e:
+            error("Invalid conductor expression: %s" % str(e))
+            return
+
         if len(hosts) == 0:
             error("Empty hostlist")
             return
@@ -580,7 +630,7 @@ class Cli(cmd.Cmd):
         try:
             os.chdir(newdir)
         except OSError as e:
-            error("Can't change dir to %s: %s" % (newdir, e.message))
+            error("Can't change dir to %s: %s" % (newdir, str(e)))
 
     def complete_cd(self, text, line, begidx, endidx):
         return self.__file_completion(text)
@@ -602,7 +652,12 @@ class Cli(cmd.Cmd):
             error("Usage: distribute <conductor_expression> <local_filename> [remote_dir=%s]" % self.default_remote_dir)
             return
         expr, filename = args[:2]
-        hosts = self.conductor.resolve(expr)
+        try:
+            hosts = self.conductor.resolve(expr)
+        except ParseException as e:
+            error("Invalid conductor expression: %s" % str(e))
+            return
+
         if len(hosts) == 0:
             error("Empty hostlist")
             return
