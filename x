@@ -104,6 +104,7 @@ if __name__ == '__main__':
         arguments = args.cmd
         if args.args:
             arguments += ' ' + ' '.join(args.args)
+        shell.set_one_command_mode(True)
         shell.onecmd(arguments)
     else:
         shell.cmdloop()

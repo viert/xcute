@@ -9,7 +9,8 @@ from termcolor import colored as term_colored
 from xclib.conductor import Conductor
 from xclib.conductor.models import Datacenter, Project, Host, Group
 import sys, fcntl, termios, struct, os, cmd, re
-
+reload(sys)
+sys.setdefaultencoding("utf8")
 
 try:
     import gnureadline as readline
@@ -83,6 +84,7 @@ class Cli(cmd.Cmd):
         self.progressbar = options.get("progressbar") or self.DEFAULT_OPTIONS["progressgbar"]
         self.ping_count = options.get("ping_count") or self.DEFAULT_OPTIONS["ping_count"]
         self.finished = False
+        self.one_command_mode = False
         self.alias_scripts = {}
         self.default_remote_dir = options.get("default_remote_dir") or "/tmp"
         if "mode" in options:
@@ -93,6 +95,9 @@ class Cli(cmd.Cmd):
                 self.mode = options["mode"]
         else:
             self.mode = self.DEFAULT_MODE
+
+    def set_one_command_mode(self, value):
+        self.one_command_mode = value
 
     @property
     def prompt(self):
@@ -128,9 +133,9 @@ class Cli(cmd.Cmd):
         readline.set_completer_delims(''.join(delims))
 
         try:
-          readline.read_history_file(self.HISTORY_FILE)
-        except (OSError, IOError), e:
-          warn("Can't read history file")
+            readline.read_history_file(self.HISTORY_FILE)
+        except (OSError, IOError) as e:
+            warn("Can't read history file")
 
     def postloop(self):
         try:
@@ -266,9 +271,11 @@ class Cli(cmd.Cmd):
         if hrlen < 10 + len(expr): hrlen = 10 + len(expr)
         hr = colored("=" * hrlen, "green")
 
-        print(hr)
-        print("Hostlist: " + expr)
-        print(hr)
+        if not self.one_command_mode:
+            print(hr)
+            print("Hostlist: " + expr)
+            print(hr)
+
         for host in hosts:
             print(host)
 
@@ -532,7 +539,12 @@ class Cli(cmd.Cmd):
             progress.start()
         for host in hosts:
             pool.start(Greenlet(worker, host, cmd))
-        pool.join()
+
+        try:
+            pool.join()
+        except KeyboardInterrupt:
+            pass
+
         if self.progressbar:
             progress.finish()
         self.print_exec_results(codes)
