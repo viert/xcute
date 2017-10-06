@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="Xcute",
-    version="0.8.0a",
+    version="0.8.1",
     packages=find_packages(),
     scripts=["x"],
     install_requires=["gevent", "requests", "termcolor", "progressbar", "gnureadline", "pyparsing"],
