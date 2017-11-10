@@ -112,11 +112,9 @@ class Conductor(object):
                  port=DEFAULT_PORT,
                  cache_dir=DEFAULT_CACHE_DIR,
                  drop_cache=False,
-                 use_recursive_fields=False,
                  print_func=None):
         self.print_func = print_func
         self.cache_ttl = cache_ttl
-        self.use_recursive_fields = use_recursive_fields
         self.cache_dir = cache_dir
         self.project_list = projects
         self.datacenters = DatacenterApi(self)
@@ -130,9 +128,7 @@ class Conductor(object):
             os.makedirs(self.cache_dir)
 
         project_list = ",".join(projects)
-        self.ex_url = "http://%s:%d/api/v1/open/executer_data?projects=%s" % (host, port, project_list)
-        if self.use_recursive_fields:
-            self.ex_url += "&recursive=true"
+        self.ex_url = "http://%s:%d/api/v1/open/executer_data?projects=%s&recursive=true" % (host, port, project_list)
 
         if drop_cache:
             self.fetch()
@@ -252,14 +248,13 @@ class Conductor(object):
             self.cache[Host]["_id"][host._id] = host
             self.cache[Host][Host.KEY][h_params[Host.KEY]] = host
             self.autocompleters[Host].add(h_params[Host.KEY])
-            if self.use_recursive_fields:
-                if "tags" in h_params and len(h_params["all_tags"]) > 0:
-                    for tag in h_params["all_tags"]:
-                        self.autocompleters["tags"].add(tag)
-                if "custom_fields" in h_params and len(h_params["all_custom_fields"]) > 0:
-                    for field in h_params["all_custom_fields"]:
-                        self.autocompleters["field_keys"].add(field["key"]+"=")
-                        self.autocompleters["field_values"].add(field["value"])
+            if "tags" in h_params and len(h_params["all_tags"]) > 0:
+                for tag in h_params["all_tags"]:
+                    self.autocompleters["tags"].add(tag)
+            if "custom_fields" in h_params and len(h_params["all_custom_fields"]) > 0:
+                for field in h_params["all_custom_fields"]:
+                    self.autocompleters["field_keys"].add(field["key"]+"=")
+                    self.autocompleters["field_values"].add(field["value"])
 
             if host.group_id is not None:
                 self.cache[Host]["group_id"][host.group_id].add(host)

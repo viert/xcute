@@ -77,7 +77,6 @@ class Cli(cmd.Cmd):
                                    host=options["conductor_host"],
                                    port=options["conductor_port"],
                                    cache_dir=options["cache_dir"],
-                                   use_recursive_fields=options["use_recursive_fields"],
                                    print_func=export_print)
         self.ssh_threads = options["ssh_threads"]
         self.user = options.get("user") or os.getlogin()
