@@ -248,10 +248,10 @@ class Conductor(object):
             self.cache[Host]["_id"][host._id] = host
             self.cache[Host][Host.KEY][h_params[Host.KEY]] = host
             self.autocompleters[Host].add(h_params[Host.KEY])
-            if "tags" in h_params and len(h_params["all_tags"]) > 0:
+            if "all_tags" in h_params and len(h_params["all_tags"]) > 0:
                 for tag in h_params["all_tags"]:
                     self.autocompleters["tags"].add(tag)
-            if "custom_fields" in h_params and len(h_params["all_custom_fields"]) > 0:
+            if "all_custom_fields" in h_params and len(h_params["all_custom_fields"]) > 0:
                 for field in h_params["all_custom_fields"]:
                     self.autocompleters["field_keys"].add(field["key"]+"=")
                     self.autocompleters["field_values"].add(field["value"])
